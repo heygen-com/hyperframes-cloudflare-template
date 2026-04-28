@@ -1,0 +1,132 @@
+# HyperFrames on Cloudflare
+
+Preview HTML-based video compositions in the browser and render MP4s server-side — on Cloudflare. Powered by [Cloudflare Containers](https://developers.cloudflare.com/containers/) for rendering and [R2](https://developers.cloudflare.com/r2/) for output storage.
+
+[HyperFrames](https://github.com/heygen-com/hyperframes) is an open-source video rendering framework: write HTML + CSS + GSAP, get a reproducible MP4.
+
+![Template preview showing the UI 3D Reveal composition playing in the browser](./docs/preview.png)
+
+## Deploy
+
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/heygen-com/hyperframes-cloudflare-template)
+
+Deploying provisions a Worker, the `RenderContainer` Durable Object, and an R2 bucket (`hyperframes-renders`). No additional secrets needed.
+
+## What this template does
+
+- **Preview** a bundled composition (`ui-3d-reveal`) in the browser using `<hyperframes-player>`, the zero-dependency web component from `@hyperframes/player`.
+- **Render** the composition to an MP4 by POSTing to `/api/render`. The route forwards the composition to a Cloudflare Container running a pre-built image with Chromium + FFmpeg + HyperFrames, uploads the MP4 to R2, and returns a URL.
+
+**Authoring happens locally.** This template ships with one pre-authored composition. To build your own, use the HyperFrames CLI on your machine:
+
+```bash
+npx hyperframes init my-video
+cd my-video
+npx hyperframes preview   # live-reload editor in your browser
+```
+
+Then swap it into this template (see [Swapping the composition](#swapping-the-composition) below).
+
+## Architecture
+
+```
+ Browser                       Worker                            Container DO (instance_type: standard-4)
+┌──────────────────┐          ┌────────────────────────┐        ┌──────────────────────────────────┐
+│ <hyperframes-    │  ─────▶  │ /api/render            │  ────▶ │ Node HTTP server (port 8080)     │
+│  player>         │          │  - load files from     │        │  - writes files to /tmp/         │
+│ preview iframe   │          │    ASSETS              │        │  - hyperframes render            │
+│                  │          │  - POST → container    │        │    (Chromium + ffmpeg)           │
+│                  │  ◀────   │  - PUT → R2 bucket     │  ◀──── │  - returns mp4 in response       │
+│                  │   url    │  - return /r/<key>     │   mp4  │                                  │
+└──────────────────┘          └────────────────────────┘        └──────────────────────────────────┘
+                                       │
+                                       ├─▶ R2 (hyperframes-renders)
+                                       │
+                                       └─▶ ASSETS (preview HTML, composition files)
+```
+
+### The container image
+
+Cold-start of a render container is faster than installing dependencies on every request because the renderer is **baked into the image** at build time, not installed at runtime:
+
+1. `node:22-bookworm-slim` base
+2. `apt-get install` Chromium system libs (`libnss3`, `libxcomposite1`, `pango`, …)
+3. `npm install hyperframes ffmpeg-static`
+4. Symlink `ffmpeg-static/ffmpeg` to `/usr/local/bin/ffmpeg`
+5. `npx hyperframes browser ensure` to download `chrome-headless-shell`
+6. Copy `container/server.mjs` (a small Node HTTP server) and `CMD ["node", "server.mjs"]`
+
+At render time, the Worker sends composition files in the request body, the container writes them to a tmp dir, runs `hyperframes render`, and streams the MP4 back. Container instances sleep after 10 minutes of inactivity (`sleepAfter` on the Container class).
+
+### Why Cloudflare Containers (and not Browser Rendering)
+
+Cloudflare's [Browser Rendering](https://developers.cloudflare.com/browser-rendering/) is a hosted Chromium API — great for screenshots and PDFs, but you can't install FFmpeg into it. HyperFrames needs full control of the Chromium process plus an FFmpeg binary on the same filesystem, which is exactly what [Cloudflare Containers](https://developers.cloudflare.com/containers/) gives you: an OCI container in a Worker-bound Durable Object, with up to 4 vCPUs and 12 GiB of RAM on `standard-4`.
+
+With 4 vCPUs, `hyperframes render --workers auto` launches 3 parallel Chrome workers, cutting the render time roughly 2× vs. the single-worker default.
+
+## Local development
+
+```bash
+npm install
+npm run dev
+```
+
+`wrangler dev` runs the Worker locally and builds + runs the container against your local Docker daemon (Docker is required for local container dev). The browser preview works without Docker; only `/api/render` needs the container.
+
+### Testing the render container in isolation
+
+If you want to iterate on the `Dockerfile` or `container/server.mjs` without booting Wrangler, you can hit the container directly:
+
+```bash
+docker build -t hf-render .
+docker run -d --rm --name hf-test -p 18080:8080 hf-render
+node scripts/test-render.mjs 18080 /tmp/out.mp4
+docker stop hf-test
+```
+
+The script reads `src/composition-manifest.json`, base64-encodes the composition files, POSTs them to the container, and writes the MP4 it returns. The bundled 13s composition renders in ~25s on a 6-vCPU host.
+
+## Project structure
+
+```
+src/
+  index.ts                    # Worker entry — preview routes + /api/render
+  container.ts                # RenderContainer Durable Object (extends @cloudflare/containers Container)
+  preview.ts                  # HTML rewriting helpers (port of lib/preview.ts)
+  composition-manifest.json   # Generated by scripts/build.mjs
+container/
+  server.mjs                  # Node HTTP server inside the container
+  package.json                # Container deps (hyperframes + ffmpeg-static)
+public/
+  index.html                  # Preview UI + Render button
+  compositions/
+    ui-3d-reveal/             # The bundled example composition
+      index.html
+      compositions/*.html
+scripts/
+  build.mjs                   # Run via `wrangler.jsonc → build.command`
+Dockerfile                    # Render container image
+wrangler.jsonc                # Worker + Container + R2 bindings
+```
+
+## Swapping the composition
+
+1. Drop your composition bundle into `public/compositions/<your-name>/`.
+2. Update `PREVIEW_COMPOSITION_DIR` in `wrangler.jsonc` (under `vars`) to match.
+3. Optionally update the player dimensions in `public/index.html` if your composition isn't 1920×1080.
+4. Re-run `npm run dev` or `npm run deploy` — `scripts/build.mjs` regenerates the manifest.
+
+## Pricing
+
+[Cloudflare Containers pricing](https://developers.cloudflare.com/containers/pricing/) — pay-per-10ms for memory, CPU, and disk. A 70-second render on `standard-4` (4 vCPU, 12 GiB) costs ~$0.008. R2 storage is $0.015/GB-month with no egress fees within Cloudflare's network.
+
+## License
+
+[Apache-2.0](./LICENSE) — same license as HyperFrames itself.
+
+## Links
+
+- [HyperFrames repo](https://github.com/heygen-com/hyperframes)
+- [HyperFrames docs](https://hyperframes.heygen.com)
+- [Cloudflare Containers docs](https://developers.cloudflare.com/containers/)
+- [Cloudflare R2 docs](https://developers.cloudflare.com/r2/)
