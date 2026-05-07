@@ -18,7 +18,7 @@ Deploying provisions a Worker, the `RenderContainer` Durable Object, and an R2 b
 
 ## What this template does
 
-- **Preview** a bundled composition (`ui-3d-reveal`) in the browser using `<hyperframes-player>`, the zero-dependency web component from `@hyperframes/player`.
+- **Preview** a bundled composition (`cloudflare-intro`) in the browser using `<hyperframes-player>`, the zero-dependency web component from `@hyperframes/player`.
 - **Render** the composition to an MP4 by POSTing to `/api/render`. The Worker streams the composition to a Cloudflare Container running a pre-built image with Chromium + FFmpeg + HyperFrames, streams the rendered MP4 directly into R2, and returns a URL.
 
 **Authoring happens locally.** This template ships with one pre-authored composition. To build your own, use the HyperFrames CLI on your machine:
@@ -88,7 +88,7 @@ node scripts/test-render.mjs 18080 /tmp/out.mp4
 docker stop hf-test
 ```
 
-The script reads `src/composition-manifest.json`, base64-encodes the composition files, POSTs them to the container, and writes the MP4 it returns. The bundled 13s composition renders in ~25s on a 6-vCPU host.
+The script reads `src/composition-manifest.json`, base64-encodes the composition files, POSTs them to the container, and writes the MP4 it returns. The bundled 9s composition renders in ~17s on a 6-vCPU host.
 
 ## Project structure
 
@@ -103,9 +103,9 @@ container/
 public/
   index.html                  # Preview UI + Render button
   compositions/
-    ui-3d-reveal/             # The bundled example composition
+    cloudflare-intro/         # The bundled example composition
       index.html
-      compositions/*.html
+      assets/                 # Cloud SVG + HF icon used by the intro
 scripts/
   build.mjs                   # Run via wrangler.jsonc → build.command
   bundle-preview.ts           # Bundles composition into single HTML via @hyperframes/core
