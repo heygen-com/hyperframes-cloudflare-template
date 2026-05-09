@@ -23,6 +23,16 @@ const MAX_GENERATE_PROMPT_BYTES = 8 * 1024;
 const MAX_GENERATE_KEY_BYTES = 1024;
 const MAX_RENDER_HTML_BYTES = 2 * 1024 * 1024;
 
+const ENCODER = new TextEncoder();
+
+function isJsonRequest(req: Request): boolean {
+  return req.headers.get("content-type")?.includes("application/json") ?? false;
+}
+
+function utf8ByteLength(s: string): number {
+  return ENCODER.encode(s).byteLength;
+}
+
 function fetchAsset(env: Env, path: string): Promise<Response> {
   return env.ASSETS.fetch(new Request(`http://assets/${path}`));
 }
@@ -57,7 +67,7 @@ function htmlToFiles(html: string): Array<{ path: string; content: string }> {
   return [
     {
       path: "index.html",
-      content: bufferToBase64(new TextEncoder().encode(html)),
+      content: bufferToBase64(ENCODER.encode(html)),
     },
   ];
 }
@@ -72,10 +82,10 @@ async function handleRender(env: Env, req: Request): Promise<Response> {
   let files: Array<{ path: string; content: string }>;
   let source: "bundled" | "html" = "bundled";
 
-  // Empty body → render the bundled composition (back-compat with existing UI).
-  // Body { html: "<!DOCTYPE..." } → render that instead.
+  // Empty body falls through to the bundled composition for back-compat with
+  // the original "click Render" flow that doesn't post any body.
   let body: RenderRequestBody | null = null;
-  if (req.headers.get("content-type")?.includes("application/json")) {
+  if (isJsonRequest(req)) {
     try {
       body = (await req.json()) as RenderRequestBody;
     } catch {
@@ -87,7 +97,7 @@ async function handleRender(env: Env, req: Request): Promise<Response> {
     if (typeof body.html !== "string") {
       return jsonError("html must be a string", 400);
     }
-    if (new Blob([body.html]).size > MAX_RENDER_HTML_BYTES) {
+    if (utf8ByteLength(body.html) > MAX_RENDER_HTML_BYTES) {
       return jsonError(`html exceeds ${MAX_RENDER_HTML_BYTES} bytes`, 413);
     }
     files = htmlToFiles(body.html);
@@ -150,7 +160,7 @@ async function handleGenerate(env: Env, req: Request): Promise<Response> {
     );
   }
 
-  if (!req.headers.get("content-type")?.includes("application/json")) {
+  if (!isJsonRequest(req)) {
     return jsonError("expected application/json", 415);
   }
 
@@ -170,12 +180,10 @@ async function handleGenerate(env: Env, req: Request): Promise<Response> {
   if (!body.prompt || typeof body.prompt !== "string") {
     return jsonError("missing prompt", 400);
   }
-  if (new Blob([body.prompt]).size > MAX_GENERATE_PROMPT_BYTES) {
+  if (utf8ByteLength(body.prompt) > MAX_GENERATE_PROMPT_BYTES) {
     return jsonError(`prompt exceeds ${MAX_GENERATE_PROMPT_BYTES} bytes`, 413);
   }
 
-  // OpenRouter analytics headers — referer = origin of the calling page so
-  // self-deployers can track usage on their OpenRouter dashboard.
   const referer = req.headers.get("origin") ?? new URL(req.url).origin;
 
   try {
@@ -239,9 +247,10 @@ export default {
     }
 
     if (req.method === "GET" && pathname === "/api/config") {
-      return Response.json({
-        aiGenEnabled: env.ENABLE_AI_GEN === "true",
-      });
+      return Response.json(
+        { aiGenEnabled: env.ENABLE_AI_GEN === "true" },
+        { headers: { "cache-control": "public, max-age=300" } },
+      );
     }
 
     if (req.method === "GET" && pathname.startsWith("/r/")) {

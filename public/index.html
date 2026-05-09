@@ -265,21 +265,16 @@
       const generateBtn = document.getElementById("generate-btn");
       const generateHint = document.getElementById("generate-hint");
 
-      // Restore key from sessionStorage so a generate→edit→regenerate cycle
-      // doesn't make the user paste their key every time. Tab close clears it.
+      // Restore the key across regenerations within a tab. sessionStorage
+      // (not localStorage) so closing the tab clears it.
       const STORED_KEY = "openrouter-key";
-      const STORED_PROMPT = "last-prompt";
       try {
         const k = sessionStorage.getItem(STORED_KEY);
         if (k) apiKeyInput.value = k;
-        const p = sessionStorage.getItem(STORED_PROMPT);
-        if (p) promptInput.value = p;
       } catch {}
 
-      // generatedHtml lives only in JS state — refresh kills it.
       let generatedHtml = null;
 
-      // Discover whether AI gen is enabled on this deployment.
       fetch("/api/config")
         .then((r) => r.json())
         .then((cfg) => {
@@ -290,10 +285,7 @@
             aiDisabledNote.hidden = false;
           }
         })
-        .catch(() => {
-          // /api/config unavailable — leave both panels hidden, the bundled
-          // composition still works.
-        });
+        .catch(() => {});
 
       generateBtn.addEventListener("click", async () => {
         const apiKey = apiKeyInput.value.trim();
@@ -310,7 +302,6 @@
         }
         try {
           sessionStorage.setItem(STORED_KEY, apiKey);
-          sessionStorage.setItem(STORED_PROMPT, prompt);
         } catch {}
 
         generateBtn.disabled = true;
@@ -329,7 +320,6 @@
           }
 
           generatedHtml = data.html;
-          // Hand HTML directly to the player via srcdoc — no Blob URL needed.
           player.removeAttribute("src");
           player.setAttribute("srcdoc", generatedHtml);
           resetBtn.hidden = false;
@@ -363,18 +353,15 @@
       renderBtn.addEventListener("click", async () => {
         renderBtn.disabled = true;
         renderHint.className = "hint";
-        renderHint.textContent = generatedHtml
-          ? "Rendering generated composition. Cold renders take 1–2 minutes; warm renders are ~25s."
-          : "Spinning up the render container (Chrome + FFmpeg). Cold renders take 1–2 minutes; warm renders are ~25s.";
+        renderHint.textContent =
+          "Rendering. Cold renders take 1–2 minutes; warm renders are ~25s.";
 
         try {
-          const init = generatedHtml
-            ? {
-                method: "POST",
-                headers: { "content-type": "application/json" },
-                body: JSON.stringify({ html: generatedHtml }),
-              }
-            : { method: "POST" };
+          const init = { method: "POST" };
+          if (generatedHtml) {
+            init.headers = { "content-type": "application/json" };
+            init.body = JSON.stringify({ html: generatedHtml });
+          }
           const res = await fetch("/api/render", init);
           if (!res.ok) {
             const body = await res.text();

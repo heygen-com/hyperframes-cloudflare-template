@@ -179,30 +179,7 @@ Pick a mood before writing: dark/premium, neon/electric, warm/editorial, clean/c
 - No \`<audio>\` element for this template.
 `;
 
-export function buildSystemPrompt(includeExample = true): string {
-  let prompt = `You are an expert motion graphics designer creating HyperFrames compositions — animated HTML videos. Your output is a single self-contained HTML document that will be rendered to MP4 by a Cloudflare Container running Chromium + FFmpeg.
-
-${HYPERFRAMES_KNOWLEDGE}
-`;
-
-  if (includeExample) {
-    prompt += `
-## Reference example
-
-Study this carefully. It demonstrates structure, layered depth, varied entrances, ambient motion through the breathe phase, and a choreographed exit:
-
-\`\`\`html
-${EXAMPLE_COMPOSITION}
-\`\`\`
-
-Patterns to replicate (not copy verbatim):
-- Root: data-composition-id, data-width, data-height, data-duration on the .composition div.
-- Timeline registered as window.__timelines["main"] = tl (object, NOT array).
-- fromTo for entrances; long-duration ambient tweens during breathe; staged exit at the end.
-`;
-  }
-
-  prompt += `
+const SKELETON_AND_CHECKLIST = `
 ## Mandatory skeleton — your output MUST follow this shape
 
 \`\`\`
@@ -250,8 +227,30 @@ Patterns to replicate (not copy verbatim):
 Return ONLY the complete HTML document. No prose, no markdown fences, no explanations. Start with <!DOCTYPE html>.
 `;
 
-  return prompt;
-}
+const SYSTEM_PROMPT_HEADER = `You are an expert motion graphics designer creating HyperFrames compositions — animated HTML videos. Your output is a single self-contained HTML document that will be rendered to MP4 by a Cloudflare Container running Chromium + FFmpeg.
+
+${HYPERFRAMES_KNOWLEDGE}
+`;
+
+const REFERENCE_EXAMPLE_SECTION = `
+## Reference example
+
+Study this carefully. It demonstrates structure, layered depth, varied entrances, ambient motion through the breathe phase, and a choreographed exit:
+
+\`\`\`html
+${EXAMPLE_COMPOSITION}
+\`\`\`
+
+Patterns to replicate (not copy verbatim):
+- Root: data-composition-id, data-width, data-height, data-duration on the .composition div.
+- Timeline registered as window.__timelines["main"] = tl (object, NOT array).
+- fromTo for entrances; long-duration ambient tweens during breathe; staged exit at the end.
+`;
+
+export const SYSTEM_PROMPT_WITH_EXAMPLE =
+  SYSTEM_PROMPT_HEADER + REFERENCE_EXAMPLE_SECTION + SKELETON_AND_CHECKLIST;
+
+export const SYSTEM_PROMPT_NO_EXAMPLE = SYSTEM_PROMPT_HEADER + SKELETON_AND_CHECKLIST;
 
 export function buildUserPrompt(userPrompt: string, durationSec: number = DEFAULT_DURATION): string {
   return `Create a HyperFrames composition for this prompt:

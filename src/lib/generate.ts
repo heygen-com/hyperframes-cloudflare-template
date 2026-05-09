@@ -1,29 +1,13 @@
-/**
- * AI generation pipeline — prompt to HyperFrames composition HTML.
- *
- * Calls OpenRouter directly via fetch (no SDK). The user supplies their own
- * OpenRouter API key in the request body — we forward it once to OpenRouter
- * and discard it. The key is never logged, persisted, or cached.
- *
- * Self-healing: lint with @hyperframes/core/lint, retry up to N times with
- * the lint feedback in a follow-up prompt.
- */
-
 import { lintHyperframeHtml } from "@hyperframes/core/lint";
-import { buildSystemPrompt, buildUserPrompt } from "./hyperframes-skill.js";
+import { SYSTEM_PROMPT_WITH_EXAMPLE, buildUserPrompt } from "./hyperframes-skill.js";
 
 export interface GenerateOptions {
   apiKey: string;
   prompt: string;
-  /** Override the default model. */
   model?: string;
-  /** Lint self-heal max retries. Default 2. */
   maxRetries?: number;
-  /** Override duration target in seconds. Default 6. */
   durationSec?: number;
-  /** Optional referer header for OpenRouter analytics. */
   referer?: string;
-  /** Optional app title for OpenRouter analytics. */
   appTitle?: string;
 }
 
@@ -95,8 +79,6 @@ async function callOpenRouter(
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
-    // OpenRouter returns 401 for bad keys, 429 for rate limit. Surface those
-    // codes back to the client so the UI can show "check your key" vs "rate limited".
     let detail = body;
     try {
       const parsed = JSON.parse(body) as OpenRouterResponse;
@@ -121,6 +103,25 @@ async function callOpenRouter(
   return text;
 }
 
+// The `invalid_inline_script_syntax` rule probes JS via `new Function(source)`,
+// which V8 isolates disallow ("Code generation from strings disallowed"). The
+// rule throws on every inline script in Workers, so filter that one variant —
+// Chrome inside the render container catches real syntax errors at render time.
+// The malformed-close-tag variant of the same code (regex-based) still runs.
+function lintFiltered(html: string): Array<{ code: string; message: string }> {
+  const result = lintHyperframeHtml(html, { filePath: "composition.html" });
+  return result.findings
+    .filter(
+      (f) =>
+        f.severity === "error" &&
+        !(
+          f.code === "invalid_inline_script_syntax" &&
+          /Code generation from strings|disallowed/i.test(f.message)
+        ),
+    )
+    .map((f) => ({ code: f.code, message: f.message }));
+}
+
 export async function generateComposition(opts: GenerateOptions): Promise<GenerateResult> {
   if (!opts.apiKey || typeof opts.apiKey !== "string") {
     throw new GenerateError("missing apiKey", 400);
@@ -134,57 +135,25 @@ export async function generateComposition(opts: GenerateOptions): Promise<Genera
   const maxRetries = opts.maxRetries ?? DEFAULT_MAX_RETRIES;
   const referer = opts.referer;
   const appTitle = opts.appTitle ?? "HyperFrames Cloudflare Template";
-
-  const systemPrompt = buildSystemPrompt(true);
   const userPrompt = buildUserPrompt(opts.prompt, opts.durationSec);
+  const callOpts = { referer, appTitle };
 
-  let html = "";
-  let attempts = 0;
-  let lintErrors: Array<{ code: string; message: string }> = [];
+  let attempts = 1;
+  let html = stripMarkdownFence(
+    await callOpenRouter(opts.apiKey, model, [
+      { role: "system", content: SYSTEM_PROMPT_WITH_EXAMPLE },
+      { role: "user", content: userPrompt },
+    ], { temperature: 0.7, ...callOpts }),
+  );
+  let lintErrors = lintFiltered(html);
 
-  // Initial generation
-  const initialText = await callOpenRouter(opts.apiKey, model, [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: userPrompt },
-  ], { temperature: 0.7, referer, appTitle });
-  attempts++;
-  html = stripMarkdownFence(initialText);
-
-  // Lint + self-heal loop
-  for (let i = 0; i <= maxRetries; i++) {
-    const result = lintHyperframeHtml(html, { filePath: "composition.html" });
-    lintErrors = result.findings
-      .filter((f) => f.severity === "error")
-      // The `invalid_inline_script_syntax` rule uses `new Function(source)` to
-      // probe JS syntax. Cloudflare Workers (V8 isolates) disallow runtime
-      // code generation, so the rule throws on every inline script and
-      // produces a guaranteed false positive. Skip the JS-parse variant
-      // here — Chrome inside the render container catches real syntax
-      // errors at render time anyway. We still keep the malformed
-      // close-tag variant of the same code, so filter only when the
-      // message hints at the JS-parse path.
-      .filter(
-        (f) =>
-          !(
-            f.code === "invalid_inline_script_syntax" &&
-            /Code generation from strings|disallowed/i.test(f.message)
-          ),
-      )
-      .map((f) => ({ code: f.code, message: f.message }));
-
-    if (lintErrors.length === 0) {
-      return { html, model, attempts, durationMs: Date.now() - t0, lintErrors: [] };
-    }
-
-    if (i === maxRetries) break;
-
-    // Ask the model to fix its own output, with lint feedback inline.
+  for (let retry = 0; retry < maxRetries && lintErrors.length > 0; retry++) {
     const errorList = lintErrors
       .map((e, idx) => `${idx + 1}. [${e.code}] ${e.message}`)
       .join("\n");
 
     const fixText = await callOpenRouter(opts.apiKey, model, [
-      { role: "system", content: systemPrompt },
+      { role: "system", content: SYSTEM_PROMPT_WITH_EXAMPLE },
       { role: "user", content: userPrompt },
       { role: "assistant", content: html },
       {
@@ -196,12 +165,11 @@ ${errorList}
 
 Return ONLY the fixed HTML — no explanations, no markdown fences. Start with <!DOCTYPE html>.`,
       },
-    ], { temperature: 0.3, referer, appTitle });
+    ], { temperature: 0.3, ...callOpts });
     attempts++;
     html = stripMarkdownFence(fixText);
+    lintErrors = lintFiltered(html);
   }
 
-  // Exhausted retries — return the last attempt with lint errors so the
-  // caller can decide whether to render anyway or surface to the user.
   return { html, model, attempts, durationMs: Date.now() - t0, lintErrors };
 }
