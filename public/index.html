@@ -8,8 +8,10 @@
     <style>
       :root {
         --bg: #07070f;
+        --panel: #11111e;
         --fg: #f5f5f7;
         --muted: #8b8b9a;
+        --border: #1c1c2a;
         --accent: #f97e3c;
         --accent-fg: #1a0e07;
       }
@@ -35,7 +37,7 @@
         width: 100%;
         aspect-ratio: 16 / 9;
         background: #000;
-        border: 1px solid #1c1c2a;
+        border: 1px solid var(--border);
         border-radius: 12px;
         overflow: hidden;
       }
@@ -62,10 +64,16 @@
         cursor: pointer;
         font-family: inherit;
       }
+      button.secondary {
+        background: transparent;
+        color: var(--fg);
+        border: 1px solid var(--border);
+      }
       button:disabled { opacity: 0.6; cursor: progress; }
       .hint { color: var(--muted); font-size: 14px; margin: 0; }
       .hint a { color: var(--fg); }
       .hint.error { color: #ff7878; }
+      .hint.warn { color: #ffb86b; }
       footer {
         margin-top: 48px;
         color: var(--muted);
@@ -75,6 +83,104 @@
       }
       footer a { color: var(--muted); text-decoration: none; }
       footer a:hover { color: var(--fg); }
+
+      /* AI generation panel */
+      details.ai-panel {
+        margin: 24px 0 0;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      details.ai-panel summary {
+        list-style: none;
+        cursor: pointer;
+        padding: 16px 20px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 600;
+        font-size: 15px;
+      }
+      details.ai-panel summary::-webkit-details-marker { display: none; }
+      details.ai-panel summary::before {
+        content: "▸";
+        color: var(--muted);
+        font-size: 12px;
+        transition: transform 0.15s;
+      }
+      details.ai-panel[open] summary::before { transform: rotate(90deg); }
+      details.ai-panel summary .badge {
+        margin-left: auto;
+        font-size: 11px;
+        font-weight: 500;
+        color: var(--accent);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .ai-body {
+        padding: 0 20px 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .ai-body label {
+        display: block;
+        font-size: 13px;
+        color: var(--muted);
+        margin-bottom: 6px;
+      }
+      .ai-body label .lbl-detail {
+        color: var(--fg);
+        font-weight: 500;
+      }
+      .ai-body input[type="password"],
+      .ai-body input[type="text"],
+      .ai-body textarea {
+        width: 100%;
+        background: var(--bg);
+        color: var(--fg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 10px 12px;
+        font: inherit;
+        font-size: 14px;
+      }
+      .ai-body textarea {
+        resize: vertical;
+        min-height: 90px;
+        font-family: inherit;
+      }
+      .ai-body input:focus,
+      .ai-body textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      .ai-actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+      .security-note {
+        font-size: 12px;
+        color: var(--muted);
+        line-height: 1.5;
+        margin: 0;
+      }
+      .security-note strong { color: var(--fg); }
+      .ai-disabled {
+        padding: 16px 20px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+      .ai-disabled code {
+        background: var(--bg);
+        border: 1px solid var(--border);
+        padding: 1px 6px;
+        border-radius: 4px;
+        font-size: 13px;
+      }
     </style>
   </head>
   <body>
@@ -87,8 +193,44 @@
         </p>
       </header>
 
-      <section class="player-wrap">
+      <details class="ai-panel" id="ai-panel" hidden>
+        <summary>
+          Generate from a prompt
+          <span class="badge">BYOK</span>
+        </summary>
+        <div class="ai-body">
+          <p class="security-note">
+            Bring your own <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" style="color: var(--fg);">OpenRouter API key</a>.
+            <strong>Your key is forwarded once to OpenRouter and discarded</strong> — this worker
+            does not log, persist, or cache it. The key lives in your tab's <code style="background: var(--bg); padding: 1px 5px; border-radius: 3px;">sessionStorage</code> only;
+            refreshing the page clears it.
+          </p>
+
+          <div>
+            <label for="api-key"><span class="lbl-detail">OpenRouter API key</span></label>
+            <input id="api-key" type="password" autocomplete="off" spellcheck="false" placeholder="sk-or-v1-..." />
+          </div>
+
+          <div>
+            <label for="prompt"><span class="lbl-detail">Prompt</span> — describe the video you want</label>
+            <textarea id="prompt" placeholder="e.g. A cinematic intro card for a startup called 'Northwind' — deep navy gradient, kinetic typography, the tagline 'we build wind' appears in DM Sans bold, accent in amber."></textarea>
+          </div>
+
+          <div class="ai-actions">
+            <button id="generate-btn">Generate composition</button>
+            <p id="generate-hint" class="hint"></p>
+          </div>
+        </div>
+      </details>
+
+      <div class="ai-disabled" id="ai-disabled" hidden>
+        AI generation is disabled on this deployment. To enable: set
+        <code>ENABLE_AI_GEN: "true"</code> in <code>wrangler.jsonc</code> vars and redeploy.
+      </div>
+
+      <section class="player-wrap" style="margin-top: 24px;">
         <hyperframes-player
+          id="player"
           src="/api/preview"
           width="1920"
           height="1080"
@@ -98,6 +240,7 @@
 
       <section class="controls">
         <button id="render-btn">Render MP4</button>
+        <button id="reset-btn" class="secondary" hidden>Reset to bundled composition</button>
         <p id="render-hint" class="hint"></p>
       </section>
 
@@ -110,27 +253,127 @@
 
     <script src="/_hyperframes/player.js"></script>
     <script>
-      const btn = document.getElementById("render-btn");
-      const hint = document.getElementById("render-hint");
+      const player = document.getElementById("player");
+      const renderBtn = document.getElementById("render-btn");
+      const renderHint = document.getElementById("render-hint");
+      const resetBtn = document.getElementById("reset-btn");
 
-      btn.addEventListener("click", async () => {
-        btn.disabled = true;
-        hint.className = "hint";
-        hint.textContent =
-          "Spinning up the render container (Chrome + FFmpeg). Cold renders take 1–2 minutes; warm renders are ~25s.";
+      const aiPanel = document.getElementById("ai-panel");
+      const aiDisabledNote = document.getElementById("ai-disabled");
+      const apiKeyInput = document.getElementById("api-key");
+      const promptInput = document.getElementById("prompt");
+      const generateBtn = document.getElementById("generate-btn");
+      const generateHint = document.getElementById("generate-hint");
+
+      // Restore the key across regenerations within a tab. sessionStorage
+      // (not localStorage) so closing the tab clears it.
+      const STORED_KEY = "openrouter-key";
+      try {
+        const k = sessionStorage.getItem(STORED_KEY);
+        if (k) apiKeyInput.value = k;
+      } catch {}
+
+      let generatedHtml = null;
+
+      fetch("/api/config")
+        .then((r) => r.json())
+        .then((cfg) => {
+          if (cfg.aiGenEnabled) {
+            aiPanel.hidden = false;
+            aiPanel.open = true;
+          } else {
+            aiDisabledNote.hidden = false;
+          }
+        })
+        .catch(() => {});
+
+      generateBtn.addEventListener("click", async () => {
+        const apiKey = apiKeyInput.value.trim();
+        const prompt = promptInput.value.trim();
+        if (!apiKey) {
+          generateHint.className = "hint error";
+          generateHint.textContent = "Paste your OpenRouter key first.";
+          return;
+        }
+        if (!prompt) {
+          generateHint.className = "hint error";
+          generateHint.textContent = "Add a prompt describing the video.";
+          return;
+        }
         try {
-          const res = await fetch("/api/render", { method: "POST" });
+          sessionStorage.setItem(STORED_KEY, apiKey);
+        } catch {}
+
+        generateBtn.disabled = true;
+        generateHint.className = "hint";
+        generateHint.textContent = "Generating composition (≈30–60s)…";
+
+        try {
+          const res = await fetch("/api/generate", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ apiKey, prompt }),
+          });
+          const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || `generate failed (${res.status})`);
+          }
+
+          generatedHtml = data.html;
+          player.removeAttribute("src");
+          player.setAttribute("srcdoc", generatedHtml);
+          resetBtn.hidden = false;
+
+          if (data.lintOk) {
+            generateHint.className = "hint";
+            generateHint.textContent =
+              `Done in ${(data.durationMs / 1000).toFixed(1)}s (${data.attempts} pass${data.attempts > 1 ? "es" : ""}, model: ${data.model}). Click "Render MP4" to capture.`;
+          } else {
+            generateHint.className = "hint warn";
+            generateHint.textContent =
+              `Generated with ${data.lintErrors.length} lint warning${data.lintErrors.length > 1 ? "s" : ""} after ${data.attempts} attempts. Preview anyway — render may fail.`;
+          }
+        } catch (err) {
+          generateHint.className = "hint error";
+          generateHint.textContent = err instanceof Error ? err.message : "Generate failed";
+        } finally {
+          generateBtn.disabled = false;
+        }
+      });
+
+      resetBtn.addEventListener("click", () => {
+        generatedHtml = null;
+        player.removeAttribute("srcdoc");
+        player.setAttribute("src", "/api/preview");
+        resetBtn.hidden = true;
+        renderHint.className = "hint";
+        renderHint.textContent = "";
+      });
+
+      renderBtn.addEventListener("click", async () => {
+        renderBtn.disabled = true;
+        renderHint.className = "hint";
+        renderHint.textContent =
+          "Rendering. Cold renders take 1–2 minutes; warm renders are ~25s.";
+
+        try {
+          const init = { method: "POST" };
+          if (generatedHtml) {
+            init.headers = { "content-type": "application/json" };
+            init.body = JSON.stringify({ html: generatedHtml });
+          }
+          const res = await fetch("/api/render", init);
           if (!res.ok) {
             const body = await res.text();
             throw new Error(body || `Render failed (${res.status})`);
           }
           const data = await res.json();
-          hint.innerHTML = `Done — <a href="${data.url}" target="_blank" rel="noopener noreferrer">open MP4</a>`;
+          renderHint.innerHTML = `Done — <a href="${data.url}" target="_blank" rel="noopener noreferrer">open MP4</a>`;
         } catch (err) {
-          hint.className = "hint error";
-          hint.textContent = err instanceof Error ? err.message : "Render failed";
+          renderHint.className = "hint error";
+          renderHint.textContent = err instanceof Error ? err.message : "Render failed";
         } finally {
-          btn.disabled = false;
+          renderBtn.disabled = false;
         }
       });
     </script>

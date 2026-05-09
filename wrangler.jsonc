@@ -8,6 +8,15 @@
 
   "build": { "command": "node scripts/build.mjs" },
 
+  // BYOK AI generation. The user supplies their own OpenRouter key in the
+  // request body — the worker forwards it once and never persists it.
+  // Self-deployers: keep this as "true" to enable the prompt panel.
+  // Public-demo deployers: flip to "false" so visitors can't run the
+  // render container on your account from generated HTML.
+  "vars": {
+    "ENABLE_AI_GEN": "true"
+  },
+
   "assets": {
     "directory": "./public",
     "binding": "ASSETS"
