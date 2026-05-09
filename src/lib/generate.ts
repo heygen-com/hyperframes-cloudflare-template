@@ -155,6 +155,21 @@ export async function generateComposition(opts: GenerateOptions): Promise<Genera
     const result = lintHyperframeHtml(html, { filePath: "composition.html" });
     lintErrors = result.findings
       .filter((f) => f.severity === "error")
+      // The `invalid_inline_script_syntax` rule uses `new Function(source)` to
+      // probe JS syntax. Cloudflare Workers (V8 isolates) disallow runtime
+      // code generation, so the rule throws on every inline script and
+      // produces a guaranteed false positive. Skip the JS-parse variant
+      // here — Chrome inside the render container catches real syntax
+      // errors at render time anyway. We still keep the malformed
+      // close-tag variant of the same code, so filter only when the
+      // message hints at the JS-parse path.
+      .filter(
+        (f) =>
+          !(
+            f.code === "invalid_inline_script_syntax" &&
+            /Code generation from strings|disallowed/i.test(f.message)
+          ),
+      )
       .map((f) => ({ code: f.code, message: f.message }));
 
     if (lintErrors.length === 0) {
