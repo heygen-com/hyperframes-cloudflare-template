@@ -1,17 +1,21 @@
 {
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts", "worker-configuration.d.ts"],
+  "exclude": ["node_modules", "container"],
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["ES2022"],
+    "jsx": "react-jsx",
     "module": "ESNext",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
     "moduleResolution": "Bundler",
-    "strict": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
     "noEmit": true,
     "skipLibCheck": true,
-    "esModuleInterop": true,
-    "isolatedModules": true,
-    "resolveJsonModule": true,
-    "types": ["@cloudflare/workers-types"]
-  },
-  "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "container"]
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "resolveJsonModule": true
+  }
 }
