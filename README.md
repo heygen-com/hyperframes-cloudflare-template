@@ -18,7 +18,7 @@ Deploying provisions a Worker, the `RenderContainer` Durable Object, and an R2 b
 
 - **Preview** a bundled composition (`cloudflare-intro`) in the browser using `<hyperframes-player>`, the zero-dependency web component from `@hyperframes/player`.
 - **Render** the composition to an MP4 by POSTing to `/api/render`. The server route streams the composition to a Cloudflare Container running a pre-built image with Chromium + FFmpeg + HyperFrames, streams the rendered MP4 directly into R2, and returns a URL.
-- **Generate from a prompt (BYOK)** — paste an OpenRouter API key and a text prompt; the `/api/generate` route runs [TanStack AI's `chat()`](https://tanstack.com/ai) with the OpenRouter adapter (Gemini 3 Flash by default) and streams the composition to the browser over SSE as it's written. The client lints the result with `@hyperframes/core/lint` via a server function and self-heals up to 2× as follow-up chat turns, then previews it in the player. Click "Render MP4" to capture it. See [AI generation](#ai-generation-byok).
+- **Generate from a prompt (BYOK)** — log in with OpenRouter (OAuth PKCE, or paste an API key) and type a text prompt; the `/api/generate` route runs [TanStack AI's `chat()`](https://tanstack.com/ai) with the OpenRouter adapter (Gemini 3 Flash by default) and streams the composition to the browser over SSE as it's written. The client lints the result with `@hyperframes/core/lint` via a server function and self-heals up to 2× as follow-up chat turns, then previews it in the player. Click "Render MP4" to capture it. See [AI generation](#ai-generation-byok).
 
 **Authoring happens locally.** This template ships with one pre-authored composition. To build your own, use the HyperFrames CLI on your machine:
 
@@ -148,7 +148,7 @@ wrangler.jsonc                # Worker + Container + R2 bindings (main: src/serv
 
 ## AI generation (BYOK)
 
-The "Generate from a prompt" panel lets a viewer paste their own OpenRouter API key, type a description, and synthesize a HyperFrames composition end-to-end — watching it stream in live. The composition previews in the player; the Render button then captures it to MP4 just like the bundled one.
+The "Generate from a prompt" panel lets a viewer log in with their own OpenRouter account (OAuth PKCE — or paste an API key manually), type a description, and synthesize a HyperFrames composition end-to-end — watching it stream in live. The composition previews in the player; the Render button then captures it to MP4 just like the bundled one.
 
 Built on [TanStack AI](https://tanstack.com/ai): `chat()` + `@tanstack/ai-openrouter` on the server, `useChat` from `@tanstack/ai-react` on the client, wired over Server-Sent Events.
 
@@ -158,7 +158,9 @@ It's already on for self-deployers — `wrangler.jsonc` sets `ENABLE_AI_GEN: "tr
 
 ### How the API key is handled
 
-- The user pastes their key into the panel; it's sent in the `forwardedProps` field of each `POST /api/generate` request body (the client uses a custom `useChat` fetcher, so every request carries the current key).
+- **Login (default):** "Log in with OpenRouter" runs [OpenRouter's OAuth PKCE flow](https://openrouter.ai/docs/use-cases/oauth-pkce) entirely in the browser (`src/lib/openrouter-oauth.ts`) — redirect to `openrouter.ai/auth`, then exchange the one-time code client-side for a runtime API key scoped to this app (revocable from the OpenRouter dashboard). No client secret; the key never touches the Worker outside of generate requests. The PKCE code verifier sits in `sessionStorage` only across the redirect and is deleted on return, before any generated composition can run.
+- **Manual (fallback):** the user can still paste a key into the panel instead.
+- Either way the key is sent in the `forwardedProps` field of each `POST /api/generate` request body (the client uses a custom `useChat` fetcher, so every request carries the current key).
 - The server route constructs a per-request OpenRouter adapter with the key; TanStack AI forwards it to `openrouter.ai` as `Authorization: Bearer <key>`.
 - The Worker does not log, cache, or persist the key. It exists only for the duration of one request.
 - Client-side, the key is held in React state only — never in `sessionStorage` or `localStorage`. Generated compositions execute in the player's iframe with same-origin access, so origin-readable storage would expose the key to model-generated code. Use a disposable, spend-capped key; a reload clears it.

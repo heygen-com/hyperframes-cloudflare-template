@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useChat } from "@tanstack/ai-react";
 import {
   DEFAULT_MODEL,
@@ -8,11 +8,14 @@ import {
   type LintError,
 } from "../lib/generation";
 import { lintComposition } from "../lib/server-fns";
+import { consumeOAuthCallback, startOpenRouterLogin } from "../lib/openrouter-oauth";
 
 // The BYOK key is deliberately kept in React state only — never in
 // sessionStorage/localStorage. Generated compositions execute in the player's
 // iframe with allow-same-origin, so anything reachable from this origin's
-// storage would be readable by model-generated code.
+// storage would be readable by model-generated code. (The OAuth PKCE verifier
+// briefly uses sessionStorage across the login redirect — see
+// openrouter-oauth.ts for why that's safe.)
 interface Hint {
   className: string;
   text: string;
@@ -26,6 +29,8 @@ export interface GenerationResult {
 
 export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResult) => void }) {
   const [apiKey, setApiKey] = useState("");
+  const [oauthConnected, setOauthConnected] = useState(false);
+  const [showManualKey, setShowManualKey] = useState(false);
   const [prompt, setPrompt] = useState("");
   const [hint, setHint] = useState<Hint | null>(null);
 
@@ -34,6 +39,42 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
   const apiKeyRef = useRef("");
   const attemptsRef = useRef(1);
   const startedAtRef = useRef(0);
+
+  // Returning from the OpenRouter consent page: exchange the one-time code
+  // for a runtime key. consumeOAuthCallback strips the code from the URL
+  // synchronously, so a second effect run (React strict mode) is a no-op.
+  useEffect(() => {
+    let cancelled = false;
+    consumeOAuthCallback()
+      .then((key) => {
+        if (cancelled || !key) return;
+        setApiKey(key);
+        setOauthConnected(true);
+        setHint({ className: "hint", text: "Connected to OpenRouter — describe your video below." });
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setHint({
+          className: "hint error",
+          text: err instanceof Error ? err.message : "OpenRouter login failed — please try again.",
+        });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  function handleLogin() {
+    setHint({ className: "hint", text: "Redirecting to OpenRouter…" });
+    void startOpenRouterLogin();
+  }
+
+  function handleDisconnect() {
+    setApiKey("");
+    apiKeyRef.current = "";
+    setOauthConnected(false);
+    setHint(null);
+  }
 
   // Custom fetcher instead of a connection adapter so each request carries
   // the current BYOK key (adapter `body` is fixed at client creation).
@@ -125,7 +166,7 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
     const key = apiKey.trim();
     const p = prompt.trim();
     if (!key) {
-      setHint({ className: "hint error", text: "Paste your OpenRouter key first." });
+      setHint({ className: "hint error", text: "Log in with OpenRouter (or paste a key) first." });
       return;
     }
     if (!p) {
@@ -158,30 +199,51 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
       </summary>
       <div className="ai-body">
         <p className="security-note">
-          Bring your own{" "}
-          <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer">
-            OpenRouter API key
-          </a>
-          . <strong>Your key is forwarded once to OpenRouter and discarded</strong> — this worker
-          does not log, persist, or cache it. In the browser it is held in memory for this tab
-          only and cleared on reload. Generated compositions run with same-origin access in the
-          preview, so use a disposable, spend-capped key.
+          Log in with{" "}
+          <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer">
+            OpenRouter
+          </a>{" "}
+          to mint a key scoped to this app — you can revoke it anytime from your OpenRouter
+          dashboard. <strong>Your key is forwarded once to OpenRouter per request and
+          discarded</strong> — this worker does not log, persist, or cache it. In the browser it
+          is held in memory for this tab only and cleared on reload. Generated compositions run
+          with same-origin access in the preview.
         </p>
 
-        <div>
-          <label htmlFor="api-key">
-            <span className="lbl-detail">OpenRouter API key</span>
-          </label>
-          <input
-            id="api-key"
-            type="password"
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="sk-or-v1-..."
-            value={apiKey}
-            onChange={(e) => setApiKey(e.target.value)}
-          />
-        </div>
+        {oauthConnected ? (
+          <div className="ai-actions">
+            <p className="hint">✓ Connected to OpenRouter</p>
+            <button type="button" onClick={handleDisconnect}>
+              Disconnect
+            </button>
+          </div>
+        ) : (
+          <div className="ai-actions">
+            <button type="button" onClick={handleLogin}>
+              Log in with OpenRouter
+            </button>
+            <button type="button" className="link-btn" onClick={() => setShowManualKey((v) => !v)}>
+              {showManualKey ? "Hide manual key entry" : "…or paste an API key instead"}
+            </button>
+          </div>
+        )}
+
+        {!oauthConnected && showManualKey && (
+          <div>
+            <label htmlFor="api-key">
+              <span className="lbl-detail">OpenRouter API key</span>
+            </label>
+            <input
+              id="api-key"
+              type="password"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="sk-or-v1-..."
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+            />
+          </div>
+        )}
 
         <div>
           <label htmlFor="prompt">
