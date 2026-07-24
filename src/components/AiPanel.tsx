@@ -27,6 +27,24 @@ export interface GenerationResult {
   lintErrors: LintError[];
 }
 
+const EXAMPLE_PROMPTS: Array<{ label: string; prompt: string }> = [
+  {
+    label: "Startup intro card",
+    prompt:
+      "A cinematic intro card for a startup called 'Northwind' — deep navy gradient, kinetic typography, the tagline 'we build wind' appears in DM Sans bold, accent in amber.",
+  },
+  {
+    label: "Stats count-up",
+    prompt:
+      "A punchy stats reveal for a developer tool: three big numbers count up in sequence — '12ms cold starts', '99.99% uptime', '3M requests/day' — dark charcoal background, electric green accents, monospace digits, each stat punches in with a subtle camera shake.",
+  },
+  {
+    label: "Quote reveal",
+    prompt:
+      "An elegant kinetic-typography quote card: the words 'Simplicity is the ultimate sophistication' appear one word at a time in a large serif face, cream background, ink-black text, a thin gold rule draws itself under the attribution '— Leonardo da Vinci' at the end.",
+  },
+];
+
 export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResult) => void }) {
   const [apiKey, setApiKey] = useState("");
   const [oauthConnected, setOauthConnected] = useState(false);
@@ -249,6 +267,20 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
           <label htmlFor="prompt">
             <span className="lbl-detail">Prompt</span> — describe the video you want
           </label>
+          <div className="example-prompts">
+            <span className="lbl-detail">Try:</span>
+            {EXAMPLE_PROMPTS.map((ex) => (
+              <button
+                key={ex.label}
+                type="button"
+                className="example-chip"
+                disabled={isLoading}
+                onClick={() => setPrompt(ex.prompt)}
+              >
+                {ex.label}
+              </button>
+            ))}
+          </div>
           <textarea
             id="prompt"
             placeholder="e.g. A cinematic intro card for a startup called 'Northwind' — deep navy gradient, kinetic typography, the tagline 'we build wind' appears in DM Sans bold, accent in amber."
