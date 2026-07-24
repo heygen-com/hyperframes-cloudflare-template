@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   base64UrlEncode,
   buildAuthUrl,
@@ -33,6 +33,48 @@ describe("computeCodeChallenge", () => {
   it("matches the RFC 7636 appendix B test vector", async () => {
     const challenge = await computeCodeChallenge("dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk");
     expect(challenge).toBe("E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM");
+  });
+});
+
+describe("consumeOAuthCallback", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("memoizes the exchange so repeat calls get the key after the one-time code is consumed", async () => {
+    // The strip is real: replaceState updates href, so only the first call
+    // ever sees ?code — repeat calls must succeed via the memoized promise.
+    const loc = { href: "https://example.com/app?code=one-time" };
+    vi.stubGlobal("window", {
+      location: loc,
+      history: {
+        replaceState: (_state: unknown, _title: string, url: string) => {
+          loc.href = url;
+        },
+      },
+    });
+    vi.stubGlobal("sessionStorage", {
+      getItem: vi.fn(() => "verifier"),
+      removeItem: vi.fn(),
+    });
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ key: "sk-or-v1-test" }),
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    vi.resetModules();
+    const { consumeOAuthCallback } = await import("./openrouter-oauth");
+
+    const first = await consumeOAuthCallback();
+    expect(first).toBe("sk-or-v1-test");
+    expect(loc.href).toBe("https://example.com/app");
+
+    // StrictMode double-effect / remount: code is gone from the URL, but the
+    // memoized exchange still yields the key without a second network call.
+    const second = await consumeOAuthCallback();
+    expect(second).toBe("sk-or-v1-test");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
 

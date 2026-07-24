@@ -11,6 +11,9 @@ import { isJsonRequest, jsonError, msg, utf8ByteLength } from "../../lib/server/
 const MAX_PROMPT_BYTES = 8 * 1024;
 const MAX_KEY_BYTES = 1024;
 const MAX_OUTPUT_TOKENS = 16000;
+// durationSec is only a prompt hint, but an absurd value could steer the
+// model toward a very long composition that inflates render time/cost.
+const MAX_DURATION_SEC = 120;
 
 interface GenerateRequestBody {
   messages?: Array<Record<string, unknown>>;
@@ -110,7 +113,7 @@ export const Route = createFileRoute("/api/generate")({
         const model = (typeof props.model === "string" ? props.model : DEFAULT_MODEL) as OpenRouterModel;
         const durationSec =
           typeof props.durationSec === "number" && Number.isFinite(props.durationSec) && props.durationSec > 0
-            ? props.durationSec
+            ? Math.min(props.durationSec, MAX_DURATION_SEC)
             : undefined;
 
         // Fix turns (any conversation with more than one user message) run

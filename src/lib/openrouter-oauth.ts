@@ -54,8 +54,21 @@ export async function startOpenRouterLogin(): Promise<void> {
  * key. Returns the key, or null when this page load is not an OAuth callback.
  * Always cleans up: the verifier is removed from sessionStorage and the code
  * is stripped from the URL before this resolves.
+ *
+ * The exchange is memoized for the lifetime of the page load: the code is
+ * one-time and the strip happens before the async exchange resolves, so a
+ * repeat call (React StrictMode double-effect, component remount) must get
+ * the same promise — not find the code gone and silently drop the key.
+ * startOpenRouterLogin navigates away, so a fresh login resets this.
  */
-export async function consumeOAuthCallback(): Promise<string | null> {
+export function consumeOAuthCallback(): Promise<string | null> {
+  pendingExchange ??= exchangeCallbackCode();
+  return pendingExchange;
+}
+
+let pendingExchange: Promise<string | null> | null = null;
+
+async function exchangeCallbackCode(): Promise<string | null> {
   const url = new URL(window.location.href);
   const code = url.searchParams.get("code");
   if (!code) return null;

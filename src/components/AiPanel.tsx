@@ -62,8 +62,9 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
   const startedAtRef = useRef(0);
 
   // Returning from the OpenRouter consent page: exchange the one-time code
-  // for a runtime key. consumeOAuthCallback strips the code from the URL
-  // synchronously, so a second effect run (React strict mode) is a no-op.
+  // for a runtime key. The exchange is memoized in openrouter-oauth.ts, so a
+  // second effect run (React strict mode, remount) awaits the same promise
+  // and still receives the key even though the one-time code is consumed.
   useEffect(() => {
     let cancelled = false;
     consumeOAuthCallback()
