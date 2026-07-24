@@ -163,7 +163,7 @@ It's already on for self-deployers — `wrangler.jsonc` sets `ENABLE_AI_GEN: "tr
 - Either way the key is sent in the `forwardedProps` field of each `POST /api/generate` request body (the client uses a custom `useChat` fetcher, so every request carries the current key).
 - The server route constructs a per-request OpenRouter adapter with the key; TanStack AI forwards it to `openrouter.ai` as `Authorization: Bearer <key>`.
 - The Worker does not log, cache, or persist the key. It exists only for the duration of one request.
-- Client-side, the key is held in React state only — never in `sessionStorage` or `localStorage`. Generated compositions execute in the player's iframe with same-origin access, so origin-readable storage would expose the key to model-generated code. Use a disposable, spend-capped key; a reload clears it.
+- Client-side, the key is held in React state only — never in `sessionStorage` or `localStorage`. Generated compositions execute in the player's iframe with same-origin access, so origin-readable storage would expose the key to model-generated code. Keeping it out of storage removes that trivial read, but it is not an isolation boundary — same-origin generated code can still reach `window.parent` and recover the key from app state, so assume a determined composition can read it. The real blast-radius control is the key itself: use a disposable, spend-capped key and revoke it from the OpenRouter dashboard when done. A reload clears it from the browser.
 
 ### Pipeline
 

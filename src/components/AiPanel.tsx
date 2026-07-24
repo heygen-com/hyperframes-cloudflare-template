@@ -12,9 +12,12 @@ import { consumeOAuthCallback, startOpenRouterLogin } from "../lib/openrouter-oa
 
 // The BYOK key is deliberately kept in React state only — never in
 // sessionStorage/localStorage. Generated compositions execute in the player's
-// iframe with allow-same-origin, so anything reachable from this origin's
-// storage would be readable by model-generated code. (The OAuth PKCE verifier
-// briefly uses sessionStorage across the login redirect — see
+// iframe with allow-same-origin, so anything in origin storage would be one
+// getItem() away from model-generated code. Note this is a bar-raiser, not an
+// isolation boundary: same-origin code can still reach window.parent and dig
+// the key out of React state or intercept the next request. The real
+// blast-radius control is the spend-capped, revocable OAuth key. (The OAuth
+// PKCE verifier briefly uses sessionStorage across the login redirect — see
 // openrouter-oauth.ts for why that's safe.)
 interface Hint {
   className: string;
@@ -224,8 +227,10 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
           to mint a key scoped to this app — you can revoke it anytime from your OpenRouter
           dashboard. <strong>Your key is forwarded once to OpenRouter per request and
           discarded</strong> — this worker does not log, persist, or cache it. In the browser it
-          is held in memory for this tab only and cleared on reload. Generated compositions run
-          with same-origin access in the preview.
+          is held in memory for this tab only and cleared on reload — but generated compositions
+          run with same-origin access in the preview, so treat the key as reachable by generated
+          code. <strong>Use a spend-capped key and revoke it when done</strong> — that cap, not
+          where the key is stored, is what limits your exposure.
         </p>
 
         {oauthConnected ? (
