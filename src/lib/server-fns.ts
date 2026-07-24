@@ -8,9 +8,10 @@ export const getAppConfig = createServerFn({ method: "GET" }).handler(async () =
 });
 
 export const lintComposition = createServerFn({ method: "POST" })
-  .validator((data: { html: string }) => {
-    if (!data || typeof data.html !== "string") throw new Error("html must be a string");
-    return data;
+  .validator((data: unknown) => {
+    const d = data as { html?: unknown } | null | undefined;
+    if (!d || typeof d.html !== "string") throw new Error("html must be a string");
+    return { html: d.html };
   })
   .handler(async ({ data }): Promise<{ errors: LintError[] }> => {
     return { errors: lintFiltered(data.html) };

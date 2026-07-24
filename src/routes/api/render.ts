@@ -8,6 +8,7 @@ import {
   loadBundledCompositionFiles,
   msg,
   utf8ByteLength,
+  type CompositionFile,
 } from "../../lib/server/assets";
 
 const MAX_RENDER_HTML_BYTES = 2 * 1024 * 1024;
@@ -22,7 +23,7 @@ export const Route = createFileRoute("/api/render")({
       POST: async ({ request }) => {
         const t0 = Date.now();
 
-        let files: Array<{ path: string; content: string }>;
+        let files: CompositionFile[];
         let source: "bundled" | "html" = "bundled";
 
         // Empty body falls through to the bundled composition for back-compat
@@ -37,6 +38,15 @@ export const Route = createFileRoute("/api/render")({
         }
 
         if (body?.html) {
+          // Same gate as /api/generate: without it, ENABLE_AI_GEN="false"
+          // deployments would still let anyone run the render container on
+          // arbitrary HTML. The bundled-composition path below stays open.
+          if (env.ENABLE_AI_GEN !== "true") {
+            return jsonError(
+              'Rendering custom HTML is disabled on this deployment. Set ENABLE_AI_GEN="true" in wrangler.jsonc vars to enable it.',
+              403,
+            );
+          }
           if (typeof body.html !== "string") {
             return jsonError("html must be a string", 400);
           }
@@ -73,9 +83,14 @@ export const Route = createFileRoute("/api/render")({
         }
 
         const key = `renders/${Date.now()}-${crypto.randomUUID()}.mp4`;
-        await env.RENDERS.put(key, containerRes.body, {
-          httpMetadata: { contentType: "video/mp4" },
-        });
+        try {
+          await env.RENDERS.put(key, containerRes.body, {
+            httpMetadata: { contentType: "video/mp4" },
+          });
+        } catch (err) {
+          console.error(`R2 put failed for ${key} (source: ${source}, ${Date.now() - t0}ms):`, err);
+          return jsonError(`failed to store rendered video: ${msg(err)}`, 500);
+        }
 
         const url = new URL(request.url);
         url.pathname = `/r/${key}`;

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useChat } from "@tanstack/ai-react";
 import {
   DEFAULT_MODEL,
@@ -9,10 +9,10 @@ import {
 } from "../lib/generation";
 import { lintComposition } from "../lib/server-fns";
 
-// Restore the key across regenerations within a tab. sessionStorage
-// (not localStorage) so closing the tab clears it.
-const STORED_KEY = "openrouter-key";
-
+// The BYOK key is deliberately kept in React state only — never in
+// sessionStorage/localStorage. Generated compositions execute in the player's
+// iframe with allow-same-origin, so anything reachable from this origin's
+// storage would be readable by model-generated code.
 interface Hint {
   className: string;
   text: string;
@@ -35,23 +35,11 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
   const attemptsRef = useRef(1);
   const startedAtRef = useRef(0);
 
-  useEffect(() => {
-    try {
-      const k = sessionStorage.getItem(STORED_KEY);
-      if (k) {
-        setApiKey(k);
-        apiKeyRef.current = k;
-      }
-    } catch {
-      /* sessionStorage unavailable */
-    }
-  }, []);
-
   // Custom fetcher instead of a connection adapter so each request carries
   // the current BYOK key (adapter `body` is fixed at client creation).
   const { messages, sendMessage, isLoading, error, clear } = useChat({
-    fetcher: ({ messages: history, threadId, runId }, { signal }) =>
-      fetch("/api/generate", {
+    fetcher: async ({ messages: history, threadId, runId }, { signal }) => {
+      const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -61,7 +49,21 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
           forwardedProps: { apiKey: apiKeyRef.current },
         }),
         signal,
-      }),
+      });
+      if (!res.ok) {
+        // The library's own non-ok handling throws "HTTP error! status: N"
+        // without reading the body, discarding the server's actionable message.
+        let message = `Request failed (${res.status})`;
+        try {
+          const body = (await res.json()) as { error?: string };
+          if (body.error) message = body.error;
+        } catch {
+          /* non-JSON error body — keep the status message */
+        }
+        throw new Error(message);
+      }
+      return res;
+    },
     onFinish: (message) => {
       const html = stripMarkdownFence(
         message.parts
@@ -83,8 +85,14 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
     let errors: LintError[];
     try {
       ({ errors } = await lintComposition({ data: { html } }));
-    } catch {
-      errors = [];
+    } catch (err) {
+      console.error("lint server fn failed:", err);
+      setHint({
+        className: "hint warn",
+        text: "Validation unavailable — skipping self-heal. Preview anyway; render may fail.",
+      });
+      onGenerated({ html, attempts: attemptsRef.current, lintErrors: [] });
+      return;
     }
 
     if (errors.length > 0 && attemptsRef.current < MAX_GENERATE_ATTEMPTS) {
@@ -124,12 +132,6 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
       setHint({ className: "hint error", text: "Add a prompt describing the video." });
       return;
     }
-    try {
-      sessionStorage.setItem(STORED_KEY, key);
-    } catch {
-      /* sessionStorage unavailable */
-    }
-
     apiKeyRef.current = key;
     attemptsRef.current = 1;
     startedAtRef.current = Date.now();
@@ -161,8 +163,9 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
             OpenRouter API key
           </a>
           . <strong>Your key is forwarded once to OpenRouter and discarded</strong> — this worker
-          does not log, persist, or cache it. The key lives in your tab's <code>sessionStorage</code>{" "}
-          only; closing the tab clears it.
+          does not log, persist, or cache it. In the browser it is held in memory for this tab
+          only and cleared on reload. Generated compositions run with same-origin access in the
+          preview, so use a disposable, spend-capped key.
         </p>
 
         <div>

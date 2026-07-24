@@ -154,14 +154,14 @@ Built on [TanStack AI](https://tanstack.com/ai): `chat()` + `@tanstack/ai-openro
 
 ### Enabling it
 
-It's already on for self-deployers — `wrangler.jsonc` sets `ENABLE_AI_GEN: "true"` in `vars`. Set it to `"false"` if you're hosting a public demo and don't want visitors triggering renders on your account.
+It's already on for self-deployers — `wrangler.jsonc` sets `ENABLE_AI_GEN: "true"` in `vars`. Set it to `"false"` if you're hosting a public demo: that disables both `/api/generate` and rendering custom HTML through `/api/render`, so visitors can only render the bundled composition on your account.
 
 ### How the API key is handled
 
 - The user pastes their key into the panel; it's sent in the `forwardedProps` field of each `POST /api/generate` request body (the client uses a custom `useChat` fetcher, so every request carries the current key).
 - The server route constructs a per-request OpenRouter adapter with the key; TanStack AI forwards it to `openrouter.ai` as `Authorization: Bearer <key>`.
 - The Worker does not log, cache, or persist the key. It exists only for the duration of one request.
-- Client-side, the key is mirrored to the tab's `sessionStorage` so generate→edit→regenerate doesn't require pasting it every time. Closing the tab clears it.
+- Client-side, the key is held in React state only — never in `sessionStorage` or `localStorage`. Generated compositions execute in the player's iframe with same-origin access, so origin-readable storage would expose the key to model-generated code. Use a disposable, spend-capped key; a reload clears it.
 
 ### Pipeline
 
@@ -184,7 +184,7 @@ POST /api/render { html }               (existing endpoint, accepts inline HTML)
    └─▶ container → MP4 → R2 → /r/<key>
 ```
 
-The default model is `google/gemini-3-flash-preview` — cheapest and fastest direct generation per ~80 eval runs in [llm-stories-hyperframes](https://github.com/jrusso1020/llm-stories-hyperframes), which the prompt is adapted from. You can pass a different `model` in `forwardedProps` to swap in any [OpenRouter model](https://openrouter.ai/models).
+The default model is `google/gemini-3-flash-preview` — cheapest and fastest direct generation per ~80 eval runs in [llm-stories-hyperframes](https://github.com/jrusso1020/llm-stories-hyperframes), which the prompt is adapted from. You can pass a different `model` in `forwardedProps` to swap in any [OpenRouter model](https://openrouter.ai/models), and a `durationSec` number to change the target composition length.
 
 ## Pricing
 

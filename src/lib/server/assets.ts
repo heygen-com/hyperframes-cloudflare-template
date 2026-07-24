@@ -1,10 +1,14 @@
 import { env } from "cloudflare:workers";
 import manifest from "../../composition-manifest.json";
+import { bufferToBase64, utf8Encode } from "../encoding";
 
-const ENCODER = new TextEncoder();
+export { bufferToBase64, utf8ByteLength } from "../encoding";
 
-export function utf8ByteLength(s: string): number {
-  return ENCODER.encode(s).byteLength;
+/** One file of a composition as the render container expects it. */
+export interface CompositionFile {
+  path: string;
+  /** base64-encoded file bytes */
+  content: string;
 }
 
 // The origin must be the incoming request's own origin: the Vite plugin's dev
@@ -14,16 +18,7 @@ export function fetchAsset(path: string, origin: string): Promise<Response> {
   return env.ASSETS.fetch(new Request(`${origin}/${path}`));
 }
 
-export function bufferToBase64(bytes: Uint8Array): string {
-  let bin = "";
-  const chunk = 0x8000;
-  for (let i = 0; i < bytes.length; i += chunk) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
-  }
-  return btoa(bin);
-}
-
-export async function loadBundledCompositionFiles(origin: string): Promise<Array<{ path: string; content: string }>> {
+export async function loadBundledCompositionFiles(origin: string): Promise<CompositionFile[]> {
   return Promise.all(
     manifest.files.map(async (rel) => {
       const res = await fetchAsset(`${manifest.dir}/${rel}`, origin);
@@ -34,8 +29,8 @@ export async function loadBundledCompositionFiles(origin: string): Promise<Array
   );
 }
 
-export function htmlToFiles(html: string): Array<{ path: string; content: string }> {
-  return [{ path: "index.html", content: bufferToBase64(ENCODER.encode(html)) }];
+export function htmlToFiles(html: string): CompositionFile[] {
+  return [{ path: "index.html", content: bufferToBase64(utf8Encode(html)) }];
 }
 
 export function jsonError(message: string, status: number): Response {

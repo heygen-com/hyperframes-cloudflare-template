@@ -6,6 +6,8 @@ export const Route = createFileRoute("/r/$")({
     handlers: {
       GET: async ({ params }) => {
         const key = params._splat ?? "";
+        // Only serve objects /api/render wrote — not arbitrary bucket keys.
+        if (!key.startsWith("renders/")) return new Response("not found", { status: 404 });
         const obj = await env.RENDERS.get(key);
         if (!obj) return new Response("not found", { status: 404 });
         const headers = new Headers();

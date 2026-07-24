@@ -87,6 +87,9 @@ export const Route = createFileRoute("/api/generate")({
           return jsonError("missing messages", 400);
         }
         for (const m of messages) {
+          if (m.role !== "user" && m.role !== "assistant") {
+            return jsonError("invalid message role", 400);
+          }
           if (m.role !== "user") continue;
           const text =
             typeof m.content === "string"
@@ -101,8 +104,14 @@ export const Route = createFileRoute("/api/generate")({
           }
         }
 
+        // Deliberate widening: BYOK callers may pass any OpenRouter model id,
+        // not just the ones in the adapter's union. OpenRouter rejects unknown
+        // ids upstream and the error streams back to the client.
         const model = (typeof props.model === "string" ? props.model : DEFAULT_MODEL) as OpenRouterModel;
-        const durationSec = typeof props.durationSec === "number" ? props.durationSec : undefined;
+        const durationSec =
+          typeof props.durationSec === "number" && Number.isFinite(props.durationSec) && props.durationSec > 0
+            ? props.durationSec
+            : undefined;
 
         // Fix turns (any conversation with more than one user message) run
         // cooler than the initial creative pass.

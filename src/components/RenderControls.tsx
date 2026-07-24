@@ -1,10 +1,8 @@
 import { useState } from "react";
 
-interface Hint {
-  className: string;
-  html?: { url: string };
-  text?: string;
-}
+type Hint =
+  | { kind: "link"; url: string }
+  | { kind: "message"; className: string; text: string };
 
 export function RenderControls({
   generatedHtml,
@@ -19,6 +17,7 @@ export function RenderControls({
   async function handleRender() {
     setRendering(true);
     setHint({
+      kind: "message",
       className: "hint",
       text: "Rendering. Cold renders take 1–2 minutes; warm renders are ~25s.",
     });
@@ -31,13 +30,22 @@ export function RenderControls({
       }
       const res = await fetch("/api/render", init);
       if (!res.ok) {
-        const body = await res.text();
-        throw new Error(body || `Render failed (${res.status})`);
+        const raw = await res.text();
+        let message = raw || `Render failed (${res.status})`;
+        try {
+          // /api/render errors are {"error": "..."} — show the message, not the envelope.
+          const parsed = JSON.parse(raw) as { error?: string };
+          if (parsed.error) message = parsed.error;
+        } catch {
+          /* non-JSON error body — show as-is */
+        }
+        throw new Error(message);
       }
       const data = (await res.json()) as { url: string };
-      setHint({ className: "hint", html: { url: data.url } });
+      setHint({ kind: "link", url: data.url });
     } catch (err) {
       setHint({
+        kind: "message",
         className: "hint error",
         text: err instanceof Error ? err.message : "Render failed",
       });
@@ -63,10 +71,10 @@ export function RenderControls({
         </button>
       )}
       {hint &&
-        (hint.html ? (
-          <p className={hint.className}>
+        (hint.kind === "link" ? (
+          <p className="hint">
             Done —{" "}
-            <a href={hint.html.url} target="_blank" rel="noopener noreferrer">
+            <a href={hint.url} target="_blank" rel="noopener noreferrer">
               open MP4
             </a>
           </p>
