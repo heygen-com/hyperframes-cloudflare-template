@@ -16,7 +16,6 @@ public/_bundled/
 public/_hyperframes/
 
 # TanStack Start generated files
-src/routeTree.gen.ts
 .tanstack
 .nitro
 .output
