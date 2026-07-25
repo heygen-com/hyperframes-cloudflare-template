@@ -34,6 +34,10 @@
     "deploy": "npm run build && wrangler deploy",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "lint": "oxlint .",
+    "lint:fix": "oxlint --fix .",
+    "format": "oxfmt .",
+    "format:check": "oxfmt --check .",
     "cf-typegen": "wrangler types"
   },
   "dependencies": {
@@ -53,8 +57,10 @@
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^6.0.1",
+    "oxfmt": "^0.60.0",
+    "oxlint": "^1.75.0",
     "tsx": "^4.21.0",
-    "typescript": "^5.9.0",
+    "typescript": "^7.0.2",
     "vite": "^8.0.0",
     "vitest": "^4.1.10",
     "wrangler": "^4.70.0"
