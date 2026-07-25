@@ -1,4 +1,4 @@
-// Run by wrangler dev/deploy via build.command. The manifest exists because
+// Run by the prepare-assets npm script before vite dev/build. The manifest exists because
 // the ASSETS binding can fetch but not list. The bundle exists because the
 // player can't stitch sub-compositions together at preview time without it.
 

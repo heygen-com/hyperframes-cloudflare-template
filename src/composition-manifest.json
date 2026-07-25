@@ -1,0 +1,8 @@
+{
+  "dir": "compositions/cloudflare-intro",
+  "files": [
+    "assets/cloudflare.svg",
+    "assets/hfsquare.svg",
+    "index.html"
+  ]
+}
