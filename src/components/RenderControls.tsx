@@ -1,8 +1,6 @@
 import { useState } from "react";
 
-type Hint =
-  | { kind: "link"; url: string }
-  | { kind: "message"; className: string; text: string };
+type Hint = { kind: "link"; url: string } | { kind: "message"; className: string; text: string };
 
 export function RenderControls({
   generatedHtml,

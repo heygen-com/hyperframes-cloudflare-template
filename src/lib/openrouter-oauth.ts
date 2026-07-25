@@ -88,7 +88,9 @@ async function exchangeCallbackCode(): Promise<string | null> {
     body: JSON.stringify({ code, code_verifier: verifier, code_challenge_method: "S256" }),
   });
   if (!res.ok) {
-    throw new Error(`OpenRouter key exchange failed (${res.status}) — please try logging in again.`);
+    throw new Error(
+      `OpenRouter key exchange failed (${res.status}) — please try logging in again.`,
+    );
   }
   const body = (await res.json()) as { key?: unknown };
   if (typeof body.key !== "string" || !body.key) {

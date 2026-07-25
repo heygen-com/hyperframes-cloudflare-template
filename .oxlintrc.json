@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "plugins": ["react", "typescript"],
+  "ignorePatterns": [
+    "node_modules/",
+    "dist/",
+    ".output/",
+    ".nitro/",
+    ".tanstack/",
+    ".wrangler/",
+    "public/_bundled/",
+    "public/_hyperframes/",
+    "src/routeTree.gen.ts",
+    "worker-configuration.d.ts"
+  ]
+}

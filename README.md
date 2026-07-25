@@ -76,11 +76,23 @@ With 4 vCPUs, `hyperframes render --workers auto` launches 3 parallel Chrome wor
 ## Local development
 
 ```bash
-npm install
-npm run dev
+bun install
+bun run dev
 ```
 
-`npm run dev` regenerates the composition manifest/preview bundle (`scripts/build.mjs`) and starts Vite on port 3000. The [Cloudflare Vite plugin](https://developers.cloudflare.com/workers/vite-plugin/) runs the Worker runtime locally, including building + running the render container against your local Docker daemon (Docker is required for local container dev). The browser preview works without Docker; only `/api/render` needs the container.
+`bun run dev` regenerates the composition manifest/preview bundle (`scripts/build.mjs`) and starts Vite on port 3000. The [Cloudflare Vite plugin](https://developers.cloudflare.com/workers/vite-plugin/) runs the Worker runtime locally, including building + running the render container against your local Docker daemon (Docker is required for local container dev). The browser preview works without Docker; only `/api/render` needs the container.
+
+### Checks
+
+```bash
+bun run typecheck   # tsc --noEmit
+bun run test        # vitest
+bun run lint        # oxlint
+bun run format      # oxfmt (use format:check in CI)
+```
+
+CI runs all of these plus a production build. `package.json` and `wrangler.jsonc`
+are excluded from the formatter on purpose — see the note in `.prettierignore`.
 
 ### Testing the render container in isolation
 
@@ -140,11 +152,11 @@ wrangler.jsonc                # Worker + Container + R2 bindings (main: src/serv
 1. Drop your composition bundle into `public/compositions/<your-name>/`.
 2. Set `PREVIEW_COMPOSITION_DIR` env var when running build/deploy:
    ```bash
-   PREVIEW_COMPOSITION_DIR=compositions/<your-name> npm run deploy
+   PREVIEW_COMPOSITION_DIR=compositions/<your-name> bun run deploy
    ```
    Or edit the default in `scripts/build.mjs` (line 9).
 3. Optionally update the player dimensions in `src/components/Player.tsx` if your composition isn't 1920×1080.
-4. Re-run `npm run dev` or `npm run deploy` — `scripts/build.mjs` regenerates the manifest and bundle.
+4. Re-run `bun run dev` or `bun run deploy` — `scripts/build.mjs` regenerates the manifest and bundle.
 
 ## AI generation (BYOK)
 
