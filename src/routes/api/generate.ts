@@ -99,7 +99,9 @@ export const Route = createFileRoute("/api/generate")({
               ? m.content
               : Array.isArray(m.parts)
                 ? m.parts
-                    .map((p: Record<string, unknown>) => (typeof p.content === "string" ? p.content : ""))
+                    .map((p: Record<string, unknown>) =>
+                      typeof p.content === "string" ? p.content : "",
+                    )
                     .join("")
                 : "";
           if (utf8ByteLength(text) > MAX_PROMPT_BYTES) {
@@ -110,9 +112,13 @@ export const Route = createFileRoute("/api/generate")({
         // Deliberate widening: BYOK callers may pass any OpenRouter model id,
         // not just the ones in the adapter's union. OpenRouter rejects unknown
         // ids upstream and the error streams back to the client.
-        const model = (typeof props.model === "string" ? props.model : DEFAULT_MODEL) as OpenRouterModel;
+        const model = (
+          typeof props.model === "string" ? props.model : DEFAULT_MODEL
+        ) as OpenRouterModel;
         const durationSec =
-          typeof props.durationSec === "number" && Number.isFinite(props.durationSec) && props.durationSec > 0
+          typeof props.durationSec === "number" &&
+          Number.isFinite(props.durationSec) &&
+          props.durationSec > 0
             ? Math.min(props.durationSec, MAX_DURATION_SEC)
             : undefined;
 
@@ -130,7 +136,9 @@ export const Route = createFileRoute("/api/generate")({
         try {
           const stream = chat({
             adapter,
-            messages: wrapFirstUserMessage(messages, durationSec) as Parameters<typeof chat>[0]["messages"],
+            messages: wrapFirstUserMessage(messages, durationSec) as Parameters<
+              typeof chat
+            >[0]["messages"],
             systemPrompts: [SYSTEM_PROMPT_WITH_EXAMPLE],
             modelOptions: {
               temperature,

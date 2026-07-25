@@ -38,7 +38,11 @@ function Home() {
       <RenderControls generatedHtml={generatedHtml} onReset={() => setGeneratedHtml(null)} />
 
       <footer>
-        <a href="https://github.com/heygen-com/hyperframes" target="_blank" rel="noopener noreferrer">
+        <a
+          href="https://github.com/heygen-com/hyperframes"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           HyperFrames on GitHub
         </a>
         <span>·</span>

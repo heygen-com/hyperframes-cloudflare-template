@@ -252,7 +252,10 @@ export const SYSTEM_PROMPT_WITH_EXAMPLE =
 
 export const SYSTEM_PROMPT_NO_EXAMPLE = SYSTEM_PROMPT_HEADER + SKELETON_AND_CHECKLIST;
 
-export function buildUserPrompt(userPrompt: string, durationSec: number = DEFAULT_DURATION): string {
+export function buildUserPrompt(
+  userPrompt: string,
+  durationSec: number = DEFAULT_DURATION,
+): string {
   return `Create a HyperFrames composition for this prompt:
 
 """

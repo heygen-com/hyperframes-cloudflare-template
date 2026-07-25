@@ -20,9 +20,7 @@ export function stripMarkdownFence(text: string): string {
 
 /** The follow-up user turn that asks the model to fix lint failures. */
 export function buildFixMessage(lintErrors: LintError[]): string {
-  const errorList = lintErrors
-    .map((e, idx) => `${idx + 1}. [${e.code}] ${e.message}`)
-    .join("\n");
+  const errorList = lintErrors.map((e, idx) => `${idx + 1}. [${e.code}] ${e.message}`).join("\n");
 
   return `The composition above failed validation. Fix these errors and return the corrected HTML.
 

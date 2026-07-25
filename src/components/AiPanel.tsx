@@ -72,7 +72,10 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
         if (cancelled || !key) return;
         setApiKey(key);
         setOauthConnected(true);
-        setHint({ className: "hint", text: "Connected to OpenRouter — describe your video below." });
+        setHint({
+          className: "hint",
+          text: "Connected to OpenRouter — describe your video below.",
+        });
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -226,12 +229,13 @@ export function AiPanel({ onGenerated }: { onGenerated: (result: GenerationResul
             OpenRouter
           </a>{" "}
           to mint a key scoped to this app — you can revoke it anytime from your OpenRouter
-          dashboard. <strong>Your key is forwarded once to OpenRouter per request and
-          discarded</strong> — this worker does not log, persist, or cache it. In the browser it
-          is held in memory for this tab only and cleared on reload — but generated compositions
-          run with same-origin access in the preview, so treat the key as reachable by generated
-          code. <strong>Use a spend-capped key and revoke it when done</strong> — that cap, not
-          where the key is stored, is what limits your exposure.
+          dashboard.{" "}
+          <strong>Your key is forwarded once to OpenRouter per request and discarded</strong> — this
+          worker does not log, persist, or cache it. In the browser it is held in memory for this
+          tab only and cleared on reload — but generated compositions run with same-origin access in
+          the preview, so treat the key as reachable by generated code.{" "}
+          <strong>Use a spend-capped key and revoke it when done</strong> — that cap, not where the
+          key is stored, is what limits your exposure.
         </p>
 
         {oauthConnected ? (

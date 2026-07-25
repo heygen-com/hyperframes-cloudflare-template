@@ -19,9 +19,7 @@ async function listFiles(dir) {
 }
 
 async function writeManifest() {
-  const files = (await listFiles(compRoot)).filter(
-    (rel) => !rel.startsWith("_bundled/"),
-  );
+  const files = (await listFiles(compRoot)).filter((rel) => !rel.startsWith("_bundled/"));
   const out = "src/composition-manifest.json";
   await mkdir(dirname(out), { recursive: true });
   await writeFile(out, JSON.stringify({ dir: COMP_DIR, files }, null, 2) + "\n");

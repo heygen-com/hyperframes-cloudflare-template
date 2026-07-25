@@ -56,11 +56,9 @@ function writeFiles(workdir, files) {
 
 function runRender(compDir, outFile) {
   return new Promise((resolveRun, reject) => {
-    const child = spawn(
-      HYPERFRAMES_BIN,
-      ["render", compDir, "-o", outFile, "--workers", "auto"],
-      { stdio: ["ignore", "pipe", "pipe"] },
-    );
+    const child = spawn(HYPERFRAMES_BIN, ["render", compDir, "-o", outFile, "--workers", "auto"], {
+      stdio: ["ignore", "pipe", "pipe"],
+    });
 
     const stderrChunks = [];
     child.stdout.on("data", (d) => process.stdout.write(d));
@@ -86,7 +84,10 @@ function runRender(compDir, outFile) {
       clearTimeout(timeoutTimer);
       if (killTimer) clearTimeout(killTimer);
       if (code === 0) resolveRun();
-      else reject(new Error(`hyperframes render exited ${code}\n${Buffer.concat(stderrChunks).toString()}`));
+      else
+        reject(
+          new Error(`hyperframes render exited ${code}\n${Buffer.concat(stderrChunks).toString()}`),
+        );
     });
   });
 }

@@ -3,7 +3,10 @@ import { useEffect, useRef } from "react";
 declare module "react" {
   namespace JSX {
     interface IntrinsicElements {
-      "hyperframes-player": React.DetailedHTMLProps<React.HTMLAttributes<HTMLElement>, HTMLElement> & {
+      "hyperframes-player": React.DetailedHTMLProps<
+        React.HTMLAttributes<HTMLElement>,
+        HTMLElement
+      > & {
         src?: string;
         width?: string | number;
         height?: string | number;
