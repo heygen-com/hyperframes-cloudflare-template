@@ -14,5 +14,5 @@ export const lintComposition = createServerFn({ method: "POST" })
     return { html: d.html };
   })
   .handler(async ({ data }): Promise<{ errors: LintError[] }> => {
-    return { errors: lintFiltered(data.html) };
+    return { errors: await lintFiltered(data.html) };
   });

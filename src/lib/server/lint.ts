@@ -6,8 +6,8 @@ import type { LintError } from "../generation";
 // rule throws on every inline script in Workers, so filter that one variant —
 // Chrome inside the render container catches real syntax errors at render time.
 // The malformed-close-tag variant of the same code (regex-based) still runs.
-export function lintFiltered(html: string): LintError[] {
-  const result = lintHyperframeHtml(html, { filePath: "composition.html" });
+export async function lintFiltered(html: string): Promise<LintError[]> {
+  const result = await lintHyperframeHtml(html, { filePath: "composition.html" });
   return result.findings
     .filter(
       (f) =>

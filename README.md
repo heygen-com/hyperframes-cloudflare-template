@@ -60,8 +60,8 @@ Cold-start of a render container is faster than installing dependencies on every
 
 1. `node:22-bookworm-slim` base
 2. `apt-get install` Chromium system libs (`libnss3`, `libxcomposite1`, `pango`, …)
-3. `npm install hyperframes ffmpeg-static`
-4. Symlink `ffmpeg-static/ffmpeg` to `/usr/local/bin/ffmpeg`
+3. `npm install hyperframes ffmpeg-static ffprobe-static`
+4. Symlink the `ffmpeg` and `ffprobe` binaries into `/usr/local/bin`
 5. `npx hyperframes browser ensure` to download `chrome-headless-shell`
 6. Copy `container/server.mjs` (a small Node HTTP server) and `CMD ["node", "server.mjs"]`
 
@@ -134,7 +134,7 @@ src/
     server/                   # Server-only helpers (assets, lint)
 container/
   server.mjs                  # Node HTTP server inside the container
-  package.json                # Container deps (hyperframes + ffmpeg-static)
+  package.json                # Container deps (hyperframes + ffmpeg-static + ffprobe-static)
 public/
   compositions/
     cloudflare-intro/         # The bundled example composition
