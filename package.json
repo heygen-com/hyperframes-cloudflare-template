@@ -42,8 +42,8 @@
   },
   "dependencies": {
     "@cloudflare/containers": "^0.0.20",
-    "@hyperframes/core": "^0.5.3",
-    "@hyperframes/player": "^0.5.3",
+    "@hyperframes/core": "^0.9.26",
+    "@hyperframes/player": "^0.9.26",
     "@tanstack/ai": "^0.42.0",
     "@tanstack/ai-openrouter": "^0.15.10",
     "@tanstack/ai-react": "^0.18.1",

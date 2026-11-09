@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "ffmpeg-static": "^5.2.0",
-    "hyperframes": "^0.4.14"
+    "ffprobe-static": "^3.1.0",
+    "hyperframes": "^0.9.26"
   }
 }
